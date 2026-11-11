@@ -1,0 +1,35 @@
+services:
+  costos-no-calidad-backend-service:
+    build: .
+    image: techchaide/costos-no-calidad-backend:1.0
+    container_name: costos_no_calidad_backend_service
+    restart: unless-stopped
+    env_file:
+      - ./.env
+    environment:
+      - TZ=America/Guayaquil
+      # checkToken interno (misma red Traefik). Evita hairpin a apps.chaide.com.
+      - AUTH_API_URL=http://seguridades_guard_service:5400/api/auths/checkToken
+      - DISABLE_AUTH=false
+      - SKIP_AUTH=false
+    networks:
+      - traefik-net
+    volumes:
+      - /usr/share/zoneinfo/America/Guayaquil:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+      # Copia en disco de la caché (evita la consulta completa de ventas tras un reinicio)
+      - coq_cache:/app/.cache
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik-net"
+      - "traefik.http.routers.costos-nc-backend-prod.rule=Host(`apps.chaide.com`) && PathPrefix(`/costosNCBA`)"
+      - "traefik.http.routers.costos-nc-backend-prod.entrypoints=websecure"
+      - "traefik.http.routers.costos-nc-backend-prod.tls=true"
+      - "traefik.http.middlewares.prod-costos-nc-backend-strip.stripprefix.prefixes=/costosNCBA"
+      - "traefik.http.routers.costos-nc-backend-prod.middlewares=prod-costos-nc-backend-strip@docker"
+      - "traefik.http.services.costos-nc-backend-prod.loadbalancer.server.port=5410"
+volumes:
+  coq_cache:
+networks:
+  traefik-net:
+    external: true
